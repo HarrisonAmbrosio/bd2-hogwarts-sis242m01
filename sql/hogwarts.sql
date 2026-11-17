@@ -249,27 +249,45 @@ UPDATE produto SET preco = preco * 0.80 WHERE loja = 'Dedosdemel';
 -- =====================================================================
 -- 3. REMOÇÃO DE DADOS (DELETE) E TESTES DE RESTRIÇÕES
 -- =====================================================================
--- Questão 13
--- Erro:
--- Explicação:
 
--- Questão 14
--- Erro:
--- Explicação:
+-- Questão 3.13 (DEVE FALHAR - erro 1451)
+-- DELETE FROM casa WHERE nome_casa = 'Sonserina';
+-- Por quê: há alunos e professores (FK id_casa) que referenciam a Sonserina;
+-- a integridade referencial impede deixar registros "órfãos".
 
--- Questão 15
--- Erro:
--- Explicação:
+-- Questão 3.14 (DEVE FALHAR - erro 3819, CHECK violada)
+-- INSERT INTO aluno (nome, ano_escolar, id_casa, saldo_galeoes, email)
+-- VALUES ('Dobby', 8, 1, 0, 'dobby@hogwarts.edu');
+-- Por quê: ano_escolar só aceita valores de 1 a 7.
 
--- Questão 16
--- Erro:
--- Explicação:
+-- Questão 3.15 (DEVE FALHAR - erro 1062, entrada duplicada)
+-- INSERT INTO aluno (nome, ano_escolar, id_casa, saldo_galeoes, email)
+-- VALUES ('Harry Potter (Polissuco)', 5, 1, 0, 'harry.potter@hogwarts.edu');
+-- Por quê: uq_aluno_email proíbe e-mails repetidos.
 
--- Questão 17
+-- Questão 3.16 (DEVE FALHAR - erro 1451)
+-- DELETE FROM professor WHERE nome = 'Severo Snape';
+-- Por quê: Snape é referenciado por disciplina (Poções) e por registro_pontos (FK).
 
--- Questão 18
+-- Questão 3.17
+DELETE FROM professor WHERE nome = 'Gilderoy Lockhart';
+-- Funciona porque nenhuma disciplina nem registro de pontos referencia
+-- o Lockhart (id 8): não há filhos dependentes dele.
 
--- Questão 19
+-- Questão 3.18  (filhos primeiro, depois o pai)
+DELETE FROM matricula
+WHERE id_aluno IN (SELECT id_aluno FROM aluno WHERE nome = 'Vicente Crabbe');
+DELETE FROM aluno WHERE nome = 'Vicente Crabbe';
+
+-- Questão 3.19
+DELETE FROM disciplina
+WHERE id_disc NOT IN (SELECT DISTINCT id_disc FROM matricula);
+
+-- Confira: 8 professores, 13 alunos, 8 disciplinas, 33 matrículas
+SELECT (SELECT COUNT(*) FROM professor) AS professores,
+       (SELECT COUNT(*) FROM aluno) AS alunos,
+       (SELECT COUNT(*) FROM disciplina) AS disciplinas,
+       (SELECT COUNT(*) FROM matricula) AS matriculas;
 
 
 -- =====================================================================
