@@ -293,50 +293,202 @@ SELECT (SELECT COUNT(*) FROM professor) AS professores,
 -- =====================================================================
 -- 4. TRIGGERS
 -- =====================================================================
--- Questão 20 - trg_pontos_casa
+DELIMITER $$
 
--- Questão 21 - trg_valida_compra
+-- Questão 4.20
+CREATE TRIGGER trg_pontos_casa
+AFTER INSERT ON registro_pontos
+FOR EACH ROW
+BEGIN
+    UPDATE casa
+    SET pontos = pontos + NEW.pontos
+    WHERE id_casa = (SELECT id_casa FROM aluno WHERE id_aluno = NEW.id_aluno);
+END$$
 
--- Questão 22 - trg_baixa_compra
+-- Questão 4.21
+CREATE TRIGGER trg_valida_compra
+BEFORE INSERT ON compra
+FOR EACH ROW
+BEGIN
+    DECLARE v_estoque INT;
+    DECLARE v_preco   DECIMAL(10,2);
+    DECLARE v_saldo   DECIMAL(10,2);
 
--- Questão 23 - trg_situacao_nota
+    SELECT estoque, preco INTO v_estoque, v_preco
+    FROM produto WHERE id_produto = NEW.id_produto;
 
--- Questão 24 - trg_audita_salario
+    SELECT saldo_galeoes INTO v_saldo
+    FROM aluno WHERE id_aluno = NEW.id_aluno;
 
--- Pergunta para pensar: por que a validação é BEFORE e a baixa é AFTER?
--- Resposta:
+    IF v_estoque < NEW.quantidade THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Estoque insuficiente no Beco Diagonal';
+    ELSEIF v_saldo < v_preco * NEW.quantidade THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Galeões insuficientes no cofre do aluno';
+    ELSE
+        SET NEW.valor_total = v_preco * NEW.quantidade;
+    END IF;
+END$$
 
--- Questão 25 - INSERT registro_pontos
+-- Questão 4.22
+CREATE TRIGGER trg_baixa_compra
+AFTER INSERT ON compra
+FOR EACH ROW
+BEGIN
+    UPDATE produto
+    SET estoque = estoque - NEW.quantidade
+    WHERE id_produto = NEW.id_produto;
 
--- Questão 25 - INSERT compra
+    UPDATE aluno
+    SET saldo_galeoes = saldo_galeoes - NEW.valor_total
+    WHERE id_aluno = NEW.id_aluno;
+END$$
 
--- Questão 25 - Rony tenta comprar a Nimbus
--- Resultado:
+-- Questão 4.23
+CREATE TRIGGER trg_situacao_nota
+BEFORE UPDATE ON matricula
+FOR EACH ROW
+BEGIN
+    IF NOT (NEW.nota <=> OLD.nota) THEN
+        SET NEW.situacao = CASE WHEN NEW.nota >= 6 THEN 'Aprovado'
+                                ELSE 'Reprovado' END;
+    END IF;
+END$$
 
--- Questão 25 - Hermione tenta comprar o caldeirão
--- Resultado:
+-- Questão 4.24
+CREATE TRIGGER trg_audita_salario
+AFTER UPDATE ON professor
+FOR EACH ROW
+BEGIN
+    IF OLD.salario <> NEW.salario THEN
+        INSERT INTO log_auditoria (tabela, operacao, descricao)
+        VALUES ('professor', 'UPDATE',
+                CONCAT(OLD.nome, ': salário de ', OLD.salario,
+                       ' para ', NEW.salario));
+    END IF;
+END$$
 
--- Questão 25 - Recuperação do Rony em Poções
+DELIMITER ;
 
--- Questão 25 - Salário e data de admissão do Hagrid
--- Linhas em log_auditoria:
--- Por que o reajuste da questão 10 não aparece:
+-- Pergunta para pensar: BEFORE x AFTER
+-- R: a validação precisa ser BEFORE porque só assim é possível barrar a
+--    compra (SIGNAL) e preencher NEW.valor_total ANTES de a linha ser
+--    gravada. A baixa do estoque/saldo é AFTER porque só deve acontecer
+--    depois que a compra foi validada e efetivamente gravada.
+
+-- Questão 4.25 (registro_pontos)
+INSERT INTO registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro) VALUES
+( 2, 3,  20, 'Feitiço de levitação perfeito', '2026-09-10'),
+( 1, 2, -10, 'Atraso na aula de Poções', '2026-09-12'),
+( 5, 2,  15, 'Poção do Morto-Vivo impecável', '2026-09-12'),
+( 8, 5,  10, 'Cuidou de um testrálio ferido', '2026-09-20'),
+(11, 4,  25, 'Ajudou os alunos do 1º ano', '2026-09-25'),
+( 4, 4,  30, 'Identificou uma Mimbulus mimbletonia', '2026-10-02'),
+( 6, 1, -20, 'Fora da cama após o toque de recolher', '2026-10-05'),
+( 1, 6,  50, 'Conjurou um Patrono corpóreo', '2026-10-15'),
+( 9, 3,  15, 'Duelo exemplar no Clube de Duelos', '2026-10-18'),
+( 5, 1, -30, 'Duelo proibido no corredor', '2026-10-31'),
+(10, 7,   5, 'Interpretação da bola de cristal', '2026-11-03'),
+(13, 4,  10, 'Colheita de mandrágoras', '2026-11-05'),
+( 3, 9,  10, 'Identificou um bezoar', '2026-11-06'),
+( 8, 3,  20, 'Resposta brilhante sobre o Diadema', '2026-11-08'),
+( 6, 2,  25, 'Antídoto para venenos comuns', '2026-11-09'),
+( 5, 9,  40, 'Melhor poção do Clube do Slugue', '2026-11-09');
+
+-- Questão 4.25 (compra) - valor_total é calculado pelo trigger
+INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra) VALUES
+( 5, 2,  1, '2026-09-01'),
+( 2, 5,  2, '2026-09-02'),
+( 1, 3, 10, '2026-09-03'),
+( 3, 4,  5, '2026-09-03'),
+( 9, 8,  1, '2026-09-15'),
+( 8, 5,  1, '2026-09-20'),
+(11, 1,  1, '2026-10-01'),
+( 6, 3, 20, '2026-10-10'),
+( 1, 7,  2, '2026-10-20'),
+(13, 4, 10, '2026-11-02');
+
+-- Teste A: Rony tenta comprar 1 Nimbus 2001 (DEVE FALHAR)
+-- INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra)
+-- VALUES (3, 2, 1, '2026-11-10');
+-- Resultado: 'Galeões insuficientes no cofre do aluno' (saldo ~6.00 < 300.00).
+
+-- Teste B: Hermione tenta comprar 1 Caldeirão de Estanho (DEVE FALHAR)
+-- INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra)
+-- VALUES (2, 6, 1, '2026-11-10');
+-- Resultado: 'Estoque insuficiente no Beco Diagonal' (estoque 0). O estoque é
+-- verificado primeiro, por isso essa mensagem aparece (Hermione tem saldo).
+
+-- Teste C: recuperação de Poções do Rony (sem mexer em situacao)
+UPDATE matricula SET nota = 6.5 WHERE id_aluno = 3 AND id_disc = 2;
+SELECT * FROM matricula WHERE id_aluno = 3 AND id_disc = 2;
+-- A situação virou 'Aprovado' automaticamente (trg_situacao_nota).
+
+-- Teste D: salário do Hagrid e depois data_admissao
+UPDATE professor SET salario = 5000.00 WHERE nome = 'Rúbeo Hagrid';
+UPDATE professor SET data_admissao = '1993-08-15' WHERE nome = 'Rúbeo Hagrid';
+SELECT * FROM log_auditoria;
+-- Aparece 1 linha: o 2º UPDATE não alterou o salário (OLD.salario = NEW.salario).
+-- O reajuste da questão 10 não aparece porque foi feito ANTES de o trigger
+-- trg_audita_salario ser criado.
+
+-- Confira: placar, saldos, estoques e total de compras
+SELECT nome_casa, pontos FROM casa ORDER BY pontos DESC;
+SELECT nome, saldo_galeoes FROM aluno WHERE id_aluno IN (1,5);
+SELECT nome_produto, estoque FROM produto WHERE id_produto IN (2,3);
+SELECT SUM(valor_total) AS soma_compras FROM compra;    -- 474.00
+SELECT COUNT(*) AS linhas_log FROM log_auditoria;       -- 1
 
 
 -- =====================================================================
 -- 5. CONTROLE DE TRANSAÇÕES (TCL)
 -- =====================================================================
--- Questão 26
+-- Questão 5.26
+START TRANSACTION;
+UPDATE aluno SET saldo_galeoes = saldo_galeoes - 50 WHERE nome = 'Draco Malfoy';
+UPDATE aluno SET saldo_galeoes = saldo_galeoes + 50 WHERE nome = 'Pansy Parkinson';
+COMMIT;
 
--- Questão 27
+-- Questão 5.27
+START TRANSACTION;
+UPDATE casa SET pontos = 0;
+SELECT nome_casa, pontos FROM casa;      -- tudo zerado
+ROLLBACK;
+SELECT nome_casa, pontos FROM casa;      -- placar voltou ao normal
 
--- Questão 28
+-- Questão 5.28
+START TRANSACTION;
+INSERT INTO compra (id_aluno, id_produto, quantidade, data_compra)
+VALUES (1, 1, 1, '2026-11-10');
+SELECT saldo_galeoes FROM aluno WHERE id_aluno = 1;          -- 47.00
+SELECT estoque FROM produto WHERE id_produto = 1;            -- 8
+ROLLBACK;
+SELECT saldo_galeoes FROM aluno WHERE id_aluno = 1;          -- 54.00
+SELECT estoque FROM produto WHERE id_produto = 1;            -- 9
+-- Os UPDATEs feitos pelo trigger fazem parte da mesma transação, então o
+-- ROLLBACK também os desfez (saldo e estoque voltaram ao valor anterior).
 
--- Questão 29
+-- Questão 5.29
+START TRANSACTION;
+INSERT INTO registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro)
+VALUES (12, 4, 15, 'Cuidou das estufas no feriado', '2026-11-10');
+SAVEPOINT sp_pontos_legitimos;
+INSERT INTO registro_pontos (id_aluno, id_prof, pontos, motivo, data_registro)
+VALUES (6, 2, 100, 'Favoritismo descarado', '2026-11-10');
+ROLLBACK TO SAVEPOINT sp_pontos_legitimos;
+COMMIT;
 
--- Questão 30
--- Resposta:
+-- Questão 5.30
+SELECT @@autocommit;
+-- 1 = autocommit LIGADO: cada comando é confirmado automaticamente, a menos
+-- que se abra uma transação com START TRANSACTION.
+-- Um CREATE TABLE (DDL) causa COMMIT IMPLÍCITO: a transação aberta é
+-- confirmada antes do comando e não pode mais ser desfeita com ROLLBACK.
 
+-- Confira: placar Grifinória 100, Corvinal 50, Lufa-Lufa 50, Sonserina 30
+SELECT nome_casa, pontos FROM casa ORDER BY pontos DESC;
+SELECT COUNT(*) AS linhas_registro FROM registro_pontos;   -- 17
 
 -- =====================================================================
 -- 6. DESAFIOS DE CONSULTA
