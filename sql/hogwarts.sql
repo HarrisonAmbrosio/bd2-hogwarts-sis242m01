@@ -204,30 +204,47 @@ SELECT (SELECT COUNT(*) FROM casa) AS casas,
 -- =====================================================================
 -- 2. MANUTENÇÃO PÓS-CARGA (ALTER E UPDATE)
 -- =====================================================================
--- Questão 1
+-- Questão 2.1 (1)
+ALTER TABLE aluno ADD COLUMN email VARCHAR(100);
+-- Questão 2.1 (2)
+ALTER TABLE matricula ADD COLUMN situacao VARCHAR(20) DEFAULT 'Cursando';
+-- Questão 2.1 (3)
+ALTER TABLE produto ADD COLUMN ativo CHAR(1) DEFAULT 'S';
+-- Questão 2.1 (4)
+ALTER TABLE casa MODIFY COLUMN fundador VARCHAR(100);
+-- Questão 2.1 (5)
+ALTER TABLE professor CHANGE COLUMN data_contratacao data_admissao DATE;
 
--- Questão 2
+DESC aluno; DESC matricula; DESC produto; DESC casa; DESC professor;
 
--- Questão 3
+-- Questão 2.2 (6)
+UPDATE aluno
+SET email = CONCAT(LOWER(REPLACE(nome, ' ', '.')), '@hogwarts.edu');
 
--- Questão 4
+-- Questão 2.2 (7)
+ALTER TABLE aluno ADD CONSTRAINT uq_aluno_email UNIQUE (email);
 
--- Questão 5
+-- Questão 2.2 (8)  Bônus do Prof. Lupin (limitado a 10)
+UPDATE matricula
+SET nota = LEAST(nota + 0.5, 10)
+WHERE id_disc IN (SELECT id_disc FROM disciplina
+                  WHERE id_prof = (SELECT id_prof FROM professor
+                                   WHERE nome = 'Remo Lupin'));
 
--- Questão 6
+-- Questão 2.2 (9)
+UPDATE matricula
+SET situacao = CASE WHEN nota >= 6 THEN 'Aprovado' ELSE 'Reprovado' END;
 
--- Questão 7
+-- Questão 2.2 (10)
+UPDATE professor
+SET salario = salario * 1.10
+WHERE id_casa IS NOT NULL AND data_admissao < '1980-01-01';
 
--- Questão 8
+-- Questão 2.2 (11)
+UPDATE produto SET ativo = 'N' WHERE estoque = 0;
 
--- Questão 9
-
--- Questão 10
-
--- Questão 11
-
--- Questão 12
-
+-- Questão 2.2 (12)
+UPDATE produto SET preco = preco * 0.80 WHERE loja = 'Dedosdemel';
 
 -- =====================================================================
 -- 3. REMOÇÃO DE DADOS (DELETE) E TESTES DE RESTRIÇÕES
