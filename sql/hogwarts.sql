@@ -493,75 +493,214 @@ SELECT COUNT(*) AS linhas_registro FROM registro_pontos;   -- 17
 -- =====================================================================
 -- 6. DESAFIOS DE CONSULTA
 -- =====================================================================
--- ---------- Nível 1: filtros e operadores especiais ----------
 
--- 6.1
 
--- 6.2
+-- ---- Nível 1 ----
+-- Questão 6.1
+SELECT nome, salario FROM professor
+WHERE salario BETWEEN 6000.00 AND 9000.00
+ORDER BY salario DESC;
 
--- 6.3
+-- Questão 6.2
+SELECT nome, ano_escolar FROM aluno
+WHERE ano_escolar IN (1, 4, 6, 7)
+ORDER BY ano_escolar;
 
--- 6.4
+-- Questão 6.3
+SELECT nome FROM aluno WHERE nome LIKE '_a%';
 
--- 6.5
+-- Questão 6.4
+SELECT nome_disc FROM disciplina WHERE id_prof IS NULL;
 
--- 6.6
+-- Questão 6.5
+SELECT nome_produto, preco FROM produto
+WHERE preco NOT BETWEEN 5 AND 20
+ORDER BY preco;
 
--- ---------- Nível 2: JOINs ----------
+-- Questão 6.6
+SELECT DISTINCT loja FROM produto ORDER BY loja;
 
--- 6.7
--- Quantos alunos e por quê:
+-- ---- Nível 2 ----
+-- Questão 6.7
+SELECT a.nome AS aluno, c.nome_casa AS casa
+FROM aluno a
+INNER JOIN casa c ON c.id_casa = a.id_casa
+ORDER BY c.nome_casa, a.nome;
+-- 12 alunos: Teddy Lupin tem id_casa NULL e o INNER JOIN descarta quem não
+-- tem correspondência na outra tabela.
 
--- 6.8
+-- Questão 6.8
+SELECT a.nome AS aluno,
+       COALESCE(c.nome_casa, 'Aguardando o Chapéu Seletor') AS casa
+FROM aluno a
+LEFT JOIN casa c ON c.id_casa = a.id_casa
+ORDER BY a.nome;
 
--- 6.9
+-- Questão 6.9
+SELECT p.nome AS professor
+FROM disciplina d
+RIGHT JOIN professor p ON p.id_prof = d.id_prof
+WHERE d.id_disc IS NULL;
 
--- 6.10
+-- Questão 6.10
+SELECT a.nome AS aluno,
+       d.nome_disc AS disciplina,
+       COALESCE(p.nome, 'Sem professor') AS professor,
+       m.nota,
+       m.situacao
+FROM aluno a
+JOIN casa c       ON c.id_casa  = a.id_casa
+JOIN matricula m  ON m.id_aluno = a.id_aluno
+JOIN disciplina d ON d.id_disc  = m.id_disc
+LEFT JOIN professor p ON p.id_prof = d.id_prof
+WHERE c.nome_casa = 'Grifinória'
+ORDER BY a.nome, d.nome_disc;
 
--- 6.11
+-- Questão 6.11
+SELECT co.id_compra AS numero_compra,
+       a.nome AS aluno,
+       p.nome_produto AS produto,
+       p.loja,
+       co.quantidade,
+       co.valor_total,
+       co.data_compra
+FROM compra co
+JOIN aluno a   ON a.id_aluno   = co.id_aluno
+JOIN produto p ON p.id_produto = co.id_produto
+ORDER BY co.data_compra, co.id_compra;
 
--- ---------- Nível 3: agrupamento e agregação ----------
+-- ---- Nível 3 ----
+-- Questão 6.12
+SELECT d.nome_disc AS disciplina,
+       COUNT(*) AS qtd_alunos,
+       ROUND(AVG(m.nota), 2) AS media,
+       MAX(m.nota) AS maior_nota,
+       MIN(m.nota) AS menor_nota
+FROM disciplina d
+JOIN matricula m ON m.id_disc = d.id_disc
+GROUP BY d.id_disc, d.nome_disc
+HAVING AVG(m.nota) >= 7
+ORDER BY media DESC;
 
--- 6.12
+-- Questão 6.13
+SELECT c.nome_casa AS casa,
+       COUNT(*) AS qtd_registros,
+       SUM(CASE WHEN r.pontos > 0 THEN r.pontos ELSE 0 END)  AS pontos_ganhos,
+       SUM(CASE WHEN r.pontos < 0 THEN -r.pontos ELSE 0 END) AS pontos_perdidos,
+       SUM(r.pontos) AS saldo
+FROM registro_pontos r
+JOIN aluno a ON a.id_aluno = r.id_aluno
+JOIN casa c  ON c.id_casa  = a.id_casa
+GROUP BY c.id_casa, c.nome_casa
+ORDER BY saldo DESC;
 
--- 6.13
+-- Questão 6.14
+SELECT p.loja,
+       COUNT(*) AS qtd_compras,
+       SUM(co.valor_total) AS faturamento
+FROM compra co
+JOIN produto p ON p.id_produto = co.id_produto
+GROUP BY p.loja
+HAVING SUM(co.valor_total) > 20
+ORDER BY faturamento DESC;
 
--- 6.14
+-- Questão 6.15
+SELECT MONTH(data_registro) AS mes,
+       COUNT(*) AS qtd_registros,
+       SUM(pontos) AS total_pontos
+FROM registro_pontos
+GROUP BY MONTH(data_registro)
+ORDER BY mes;
 
--- 6.15
+-- Questão 6.16
+SELECT p.nome AS professor,
+       COUNT(*) AS qtd_registros,
+       SUM(r.pontos) AS total_concedido
+FROM registro_pontos r
+JOIN professor p ON p.id_prof = r.id_prof
+GROUP BY p.id_prof, p.nome
+HAVING COUNT(*) >= 2
+ORDER BY total_concedido DESC;
 
--- 6.16
+-- ---- Nível 4 ----
+-- Questão 6.17
+SELECT nome FROM aluno
+WHERE id_aluno IN (SELECT id_aluno FROM compra
+                   WHERE id_produto IN (SELECT id_produto FROM produto
+                                        WHERE loja = 'Dedosdemel'));
 
--- ---------- Nível 4: subconsultas ----------
+-- Questão 6.18
+SELECT nome_produto, estoque FROM produto
+WHERE id_produto NOT IN (SELECT id_produto FROM compra);
 
--- 6.17
+-- Questão 6.19
+SELECT nome, saldo_galeoes FROM aluno
+WHERE saldo_galeoes > (SELECT AVG(saldo_galeoes) FROM aluno);
 
--- 6.18
+-- Questão 6.20
+SELECT nome, salario FROM professor
+WHERE salario > ALL (SELECT salario FROM professor WHERE id_casa IS NULL);
 
--- 6.19
+-- Questão 6.21
+SELECT nome, saldo_galeoes FROM aluno
+WHERE (id_casa IS NULL OR id_casa <> (SELECT id_casa FROM casa WHERE nome_casa = 'Sonserina'))
+  AND saldo_galeoes > ANY (SELECT saldo_galeoes FROM aluno
+                           WHERE id_casa = (SELECT id_casa FROM casa
+                                            WHERE nome_casa = 'Sonserina'));
+-- > ANY equivale a comparar com o MENOR valor da subconsulta: basta ser maior
+-- que ALGUM sonserino, ou seja, maior que o que tem menos galeões.
 
--- 6.20
+-- Questão 6.22
+SELECT c.nome_casa FROM casa c
+WHERE EXISTS (SELECT 1
+              FROM aluno a
+              JOIN matricula m ON m.id_aluno = a.id_aluno
+              WHERE a.id_casa = c.id_casa AND m.nota = 10);
 
--- 6.21
--- > ANY equivale a:
+-- Questão 6.23
+SELECT a.nome FROM aluno a
+WHERE NOT EXISTS (SELECT 1 FROM compra co WHERE co.id_aluno = a.id_aluno);
 
--- 6.22
+-- Questão 6.24
+SELECT c.nome_casa AS casa,
+       ROUND(AVG(t.media_aluno), 2) AS media_da_casa
+FROM (SELECT id_aluno, AVG(nota) AS media_aluno
+      FROM matricula
+      GROUP BY id_aluno) t
+JOIN aluno a ON a.id_aluno = t.id_aluno
+JOIN casa c  ON c.id_casa  = a.id_casa
+GROUP BY c.id_casa, c.nome_casa
+ORDER BY media_da_casa DESC;
 
--- 6.23
+-- ---- Nível 5 ----
+-- Questão 6.25
+SELECT nome, 'Aluno' AS vinculo FROM aluno
+UNION ALL
+SELECT nome, 'Professor' AS vinculo FROM professor
+ORDER BY nome;
 
--- 6.24
+-- Questão 6.26
+SELECT a.nome FROM aluno a WHERE a.id_aluno IN (SELECT id_aluno FROM compra)
+UNION ALL
+SELECT a.nome FROM aluno a WHERE a.id_aluno IN (SELECT id_aluno FROM registro_pontos);
+-- 27 linhas
 
--- ---------- Nível 5: UNION ALL ----------
+SELECT a.nome FROM aluno a WHERE a.id_aluno IN (SELECT id_aluno FROM compra)
+UNION
+SELECT a.nome FROM aluno a WHERE a.id_aluno IN (SELECT id_aluno FROM registro_pontos);
+-- 12 linhas
+-- UNION ALL mantém todas as linhas (inclusive repetidas); UNION remove
+-- duplicatas, então quem aparece nas duas consultas conta só uma vez.
 
--- 6.25
-
--- 6.26
--- Linhas com UNION ALL:
--- Linhas com UNION:
--- Explicação:
-
--- 6.27
-
+-- Questão 6.27
+SELECT 'Total de pontos distribuídos' AS indicador, SUM(pontos) AS valor
+FROM registro_pontos
+UNION ALL
+SELECT 'Galeões gastos na loja', SUM(valor_total) FROM compra
+UNION ALL
+SELECT 'Folha salarial dos professores', SUM(salario) FROM professor
+UNION ALL
+SELECT 'Galeões nos cofres dos alunos', SUM(saldo_galeoes) FROM aluno;
 
 -- =====================================================================
 -- 7. VIEWS
